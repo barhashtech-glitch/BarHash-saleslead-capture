@@ -13,7 +13,8 @@ cp .env.example .env
 
 Fill in `.env`:
 
-- `ANTHROPIC_API_KEY` — from console.anthropic.com
+- `GEMINI_API_KEY` — free, get one at aistudio.google.com/apikey (Google
+  account, no credit card needed)
 - SMTP settings — for the email notification (any provider works: Gmail app
   password, SendGrid, Mailgun, etc.)
 - Google Sheets — create a Google Cloud service account, download its JSON

@@ -18,26 +18,29 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = 'claude-sonnet-4-6';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const MODEL = 'gemini-2.0-flash';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 const SYSTEM_PROMPT = `You are a friendly, efficient sales assistant for a company offering three services: (1) Real Estate, (2) Trading (financial/commodities trading), and (3) POS and IT Solutions.
 Your job: figure out which service(s) the visitor is interested in, understand their need in 1-2 sentences, and collect their name and a phone number or email — one question at a time. Do not be pushy or repetitive. Keep every message under 3 sentences.
-Once you have: name, contact (phone or email), interest area, and a short note on their need, call the save_lead tool with that data, then send a short warm closing message thanking them and saying someone will follow up soon. Only call save_lead once, and only with complete data.`;
+Once you have: name, contact (phone or email), interest area, and a short note on their need, call the save_lead function with that data, then send a short warm closing message thanking them and saying someone will follow up soon. Only call save_lead once, and only with complete data.`;
 
 const SAVE_LEAD_TOOL = {
-  name: 'save_lead',
-  description: 'Save a captured lead once name, contact info, and service interest are known.',
-  input_schema: {
-    type: 'object',
-    properties: {
-      name: { type: 'string' },
-      contact: { type: 'string', description: 'phone number or email' },
-      interest: { type: 'string', description: 'Real Estate, Trading, or POS & IT Solutions' },
-      need: { type: 'string', description: 'brief note on what they need' }
-    },
-    required: ['name', 'contact', 'interest']
-  }
+  functionDeclarations: [{
+    name: 'save_lead',
+    description: 'Save a captured lead once name, contact info, and service interest are known.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        contact: { type: 'string', description: 'phone number or email' },
+        interest: { type: 'string', description: 'Real Estate, Trading, or POS & IT Solutions' },
+        need: { type: 'string', description: 'brief note on what they need' }
+      },
+      required: ['name', 'contact', 'interest']
+    }
+  }]
 };
 
 // ---------- Lead delivery: email + Google Sheet + (later) CRM ----------
@@ -106,41 +109,40 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'history required' });
     }
 
-    let messages = history.map(m => ({ role: m.role, content: m.content }));
+    // Gemini uses role 'user' / 'model' and parts:[{text}]
+    let contents = history.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
     let leadSaved = false;
     let finalText = '';
 
-    // Loop to handle tool_use turns
     for (let i = 0; i < 3; i++) {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch(GEMINI_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 500,
-          system: SYSTEM_PROMPT,
-          messages,
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents,
           tools: [SAVE_LEAD_TOOL]
         })
       });
       const data = await response.json();
       if (data.error) throw new Error(data.error.message);
 
-      const textBlock = data.content.find(b => b.type === 'text');
-      const toolBlock = data.content.find(b => b.type === 'tool_use');
-      finalText = textBlock ? textBlock.text : finalText;
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const textPart = parts.find(p => p.text);
+      const funcPart = parts.find(p => p.functionCall);
+      if (textPart) finalText = textPart.text;
 
-      if (toolBlock && toolBlock.name === 'save_lead') {
-        await saveLead(toolBlock.input);
+      if (funcPart && funcPart.functionCall.name === 'save_lead') {
+        await saveLead(funcPart.functionCall.args);
         leadSaved = true;
-        messages.push({ role: 'assistant', content: data.content });
-        messages.push({
+        contents.push({ role: 'model', parts: [{ functionCall: funcPart.functionCall }] });
+        contents.push({
           role: 'user',
-          content: [{ type: 'tool_result', tool_use_id: toolBlock.id, content: 'saved' }]
+          parts: [{ functionResponse: { name: 'save_lead', response: { result: 'saved' } } }]
         });
         continue; // let the model produce its closing message
       }
