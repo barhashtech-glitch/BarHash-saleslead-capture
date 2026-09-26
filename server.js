@@ -20,7 +20,7 @@ app.use(express.static('public'));
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const MODEL = 'gemini-2.0-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 const SYSTEM_PROMPT = `You are a friendly, efficient sales assistant for a company offering three services: (1) Real Estate, (2) Trading (financial/commodities trading), and (3) POS and IT Solutions.
 Your job: figure out which service(s) the visitor is interested in, understand their need in 1-2 sentences, and collect their name and a phone number or email — one question at a time. Do not be pushy or repetitive. Keep every message under 3 sentences.
@@ -121,7 +121,10 @@ app.post('/api/chat', async (req, res) => {
     for (let i = 0; i < 3; i++) {
       const response = await fetch(GEMINI_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': GEMINI_API_KEY
+        },
         body: JSON.stringify({
           system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
           contents,
