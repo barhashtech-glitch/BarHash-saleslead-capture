@@ -21,7 +21,7 @@ app.use(express.static('public'));
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-4-6';
 
-const SYSTEM_PROMPT = `You are a friendly, efficient sales assistant for a company offering three services: (1) Real Estate, (2) Trading (financial/commodities trading), and (3) IT / Security Solutions & POS Solutions.
+const SYSTEM_PROMPT = `You are a friendly, efficient sales assistant for a company offering three services: (1) Real Estate, (2) Trading (financial/commodities trading), and (3) POS and IT Solutions.
 Your job: figure out which service(s) the visitor is interested in, understand their need in 1-2 sentences, and collect their name and a phone number or email — one question at a time. Do not be pushy or repetitive. Keep every message under 3 sentences.
 Once you have: name, contact (phone or email), interest area, and a short note on their need, call the save_lead tool with that data, then send a short warm closing message thanking them and saying someone will follow up soon. Only call save_lead once, and only with complete data.`;
 
@@ -33,7 +33,7 @@ const SAVE_LEAD_TOOL = {
     properties: {
       name: { type: 'string' },
       contact: { type: 'string', description: 'phone number or email' },
-      interest: { type: 'string', description: 'Real Estate, Trading, or IT / Security Solutions & POS Solutions' },
+      interest: { type: 'string', description: 'Real Estate, Trading, or POS & IT Solutions' },
       need: { type: 'string', description: 'brief note on what they need' }
     },
     required: ['name', 'contact', 'interest']

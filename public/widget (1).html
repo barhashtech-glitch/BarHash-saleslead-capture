@@ -1,0 +1,79 @@
+<!--
+  Embed this on your site by copying this <div> + <script> block wherever
+  you want the chat to appear, e.g. right before </body>.
+  Update API_BASE below to your server's URL once deployed.
+-->
+<div id="lead-chat-widget"></div>
+<script>
+(function () {
+  const API_BASE = ''; // e.g. 'https://api.yoursite.com' — leave '' if same origin as server.js
+
+  const root = document.getElementById('lead-chat-widget');
+  root.innerHTML = `
+    <style>
+      #lcw-card{max-width:420px;border:1px solid #e5e7eb;border-radius:14px;font-family:-apple-system,sans-serif;background:#fff;overflow:hidden;}
+      #lcw-head{padding:14px 16px;border-bottom:1px solid #e5e7eb;}
+      #lcw-head h3{margin:0;font-size:15px;}
+      #lcw-head p{margin:2px 0 0;font-size:12px;color:#6b7280;}
+      #lcw-msgs{height:320px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;}
+      .lcw-msg{max-width:80%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.4;}
+      .lcw-bot{background:#eef1f5;align-self:flex-start;}
+      .lcw-user{background:#2563eb;color:#fff;align-self:flex-end;}
+      #lcw-row{display:flex;gap:6px;padding:10px;border-top:1px solid #e5e7eb;}
+      #lcw-input{flex:1;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;}
+      #lcw-send{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:0 14px;font-size:13px;cursor:pointer;}
+    </style>
+    <div id="lcw-card">
+      <div id="lcw-head"><h3>👋 Let's find the right fit</h3><p>Real Estate · Trading · POS &amp; IT Solutions</p></div>
+      <div id="lcw-msgs"></div>
+      <div id="lcw-row"><input id="lcw-input" type="text" placeholder="Type a message…"><button id="lcw-send">Send</button></div>
+    </div>
+  `;
+
+  const msgsEl = root.querySelector('#lcw-msgs');
+  const inputEl = root.querySelector('#lcw-input');
+  const sendBtn = root.querySelector('#lcw-send');
+  let history = [];
+
+  function addMsg(role, text) {
+    const d = document.createElement('div');
+    d.className = 'lcw-msg ' + (role === 'user' ? 'lcw-user' : 'lcw-bot');
+    d.textContent = text;
+    msgsEl.appendChild(d);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+
+  async function callChat() {
+    const res = await fetch(API_BASE + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history })
+    });
+    const data = await res.json();
+    if (data.reply) {
+      addMsg('assistant', data.reply);
+      history.push({ role: 'assistant', content: data.reply });
+    }
+    if (data.leadSaved) {
+      inputEl.disabled = true;
+      sendBtn.disabled = true;
+    }
+  }
+
+  async function send() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    addMsg('user', text);
+    history.push({ role: 'user', content: text });
+    inputEl.value = '';
+    await callChat();
+  }
+
+  sendBtn.addEventListener('click', send);
+  inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+
+  // Kick off with a greeting
+  history.push({ role: 'user', content: 'Greet the visitor and ask which service they need help with.' });
+  callChat();
+})();
+</script>

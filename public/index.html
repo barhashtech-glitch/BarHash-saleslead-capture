@@ -1,1 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chat with Us — Real Estate | Trading | POS & IT</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#ffffff; --ink:#1c1e21; --sub:#6b7280;
+  --accent:#2563eb; --accent-ink:#ffffff; --bot:#eef1f5; --bubble-user:#2563eb;
+  --border:#e5e7eb;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  display:flex; align-items:center; justify-content:center;
+}
+.wrap{width:100%; max-width:480px; height:100%; display:flex; flex-direction:column;}
+.card{
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
+  display:flex; flex-direction:column; flex:1; margin:12px; overflow:hidden; min-height:0;
+}
+.head{padding:16px 18px; border-bottom:1px solid var(--border);}
+.head h1{font-size:16px; margin:0 0 2px;}
+.head p{font-size:12px; color:var(--sub); margin:0;}
+.msgs{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px;}
+.msg{max-width:82%; padding:10px 13px; border-radius:14px; font-size:14px; line-height:1.4; white-space:pre-wrap;}
+.msg.bot{background:var(--bot); align-self:flex-start; border-bottom-left-radius:4px;}
+.msg.user{background:var(--bubble-user); color:var(--accent-ink); align-self:flex-end; border-bottom-right-radius:4px;}
+.typing{align-self:flex-start; color:var(--sub); font-size:13px; padding:0 4px;}
+.inputRow{display:flex; gap:8px; padding:12px; border-top:1px solid var(--border);}
+input[type=text]{flex:1; padding:11px 14px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--ink); font-size:14px; outline:none;}
+button.send{background:var(--accent); color:var(--accent-ink); border:none; border-radius:10px; padding:0 18px; font-size:14px; font-weight:600; cursor:pointer;}
+button.send:disabled{opacity:.5;}
+.done{padding:20px; text-align:center;}
+.done h2{margin:0 0 6px; font-size:17px;}
+.done p{color:var(--sub); font-size:14px;}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+  <div class="head">
+    <h1>👋 Let's find the right fit</h1>
+    <p>Real Estate · Trading · POS &amp; IT Solutions</p>
+  </div>
+  <div class="msgs" id="msgs"></div>
+  <div class="inputRow" id="inputRow">
+    <input type="text" id="inputBox" placeholder="Type your message…" autocomplete="off">
+    <button class="send" id="sendBtn">Send</button>
+  </div>
+</div></div>
 
+<script>
+// Same origin as this page by default — change if your server lives elsewhere.
+const API_BASE = '';
+
+const msgsEl = document.getElementById('msgs');
+const inputBox = document.getElementById('inputBox');
+const sendBtn = document.getElementById('sendBtn');
+const inputRow = document.getElementById('inputRow');
+let history = [];
+
+function addMsg(role, text){
+  const d = document.createElement('div');
+  d.className = 'msg ' + (role === 'user' ? 'user' : 'bot');
+  d.textContent = text;
+  msgsEl.appendChild(d);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+function showTyping(){
+  const d = document.createElement('div');
+  d.className = 'typing'; d.id = 'typingIndicator'; d.textContent = 'Typing…';
+  msgsEl.appendChild(d); msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+function hideTyping(){ const t = document.getElementById('typingIndicator'); if(t) t.remove(); }
+
+async function callChat(){
+  showTyping();
+  sendBtn.disabled = true;
+  try{
+    const res = await fetch(API_BASE + '/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ history })
+    });
+    const data = await res.json();
+    hideTyping();
+    if(data.reply){
+      addMsg('bot', data.reply);
+      history.push({role:'assistant', content: data.reply});
+    }
+    if(data.leadSaved){
+      setTimeout(() => {
+        inputRow.innerHTML = '<div class="done"><h2>✅ Got it — thank you!</h2><p>We\\'ll be in touch soon.</p></div>';
+      }, 300);
+    }
+  }catch(e){
+    hideTyping();
+    addMsg('bot', "Sorry, something went wrong — mind trying again?");
+  }
+  sendBtn.disabled = false;
+}
+
+async function send(){
+  const text = inputBox.value.trim();
+  if(!text) return;
+  addMsg('user', text);
+  history.push({role:'user', content: text});
+  inputBox.value = '';
+  await callChat();
+}
+
+sendBtn.addEventListener('click', send);
+inputBox.addEventListener('keydown', e => { if(e.key === 'Enter') send(); });
+
+// Kick off with a greeting
+history.push({role:'user', content: 'Greet the visitor and ask which service they need help with.'});
+callChat();
+</script>
+</body>
+</html>
